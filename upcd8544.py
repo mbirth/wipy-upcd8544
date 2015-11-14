@@ -113,9 +113,9 @@ class PCD8544:
         # 0x0c - normal display mode
 
     def position(self, x, y):
-        """ goto to column x in seg y """
-        assert 0 <= x <= 83, "x must be between 0 and 83"
-        assert 0 <= y <=  5, "y must be between 0 and 5"
+        """ set cursor to bank y, column x """
+        assert 0 <= x < self.width, "x must be between 0 and 83"
+        assert 0 <= y < self.height // 8, "y must be between 0 and 5"
         self.command([x + 0x80, y + 0x40])
 
     def clear(self):
