@@ -9,7 +9,7 @@ __copyright__  = "Copyright 2015, Markus Birth"
 __credits__    = ["Markus Birth"]
 __license__    = "MIT"
 __version__    = "1.0"
-__maintainer__ ="Markus Birth"
+__maintainer__ = "Markus Birth"
 __email__      = "markus@birth-online.de"
 __status__     = "Production"
 
@@ -64,9 +64,24 @@ import struct
 import time
 
 class PCD8544:
+    ADDRESSING_HORIZ = 0x00
+    ADDRESSING_VERT  = 0x02
+    INSTR_BASIC = 0x00
+    INSTR_EXT   = 0x01
+    POWER_UP   = 0x00
+    POWER_DOWN = 0x04
+    DISPLAY_BLANK   = 0x08
+    DISPLAY_ALL     = 0x09
+    DISPLAY_NORMAL  = 0x0c
+    DISPLAY_INVERSE = 0x0d
+
     def __init__(self, spi, rst, ce, dc, light, pwr=None):
         self.width  = 84
         self.height = 48
+        self.power      = self.POWER_UP
+        self.addressing = self.ADDRESSING_HORIZ
+        self.instr      = self.INSTR_BASIC
+        self.display_mode = self.DISPLAY_NORMAL
 
         # init the SPI bus and pins
         spi.init(spi.MASTER, baudrate=328125, bits=8, polarity=0, phase=1, firstbit=spi.MSB)
@@ -98,8 +113,40 @@ class PCD8544:
         self.power_on()
         self.ce.value(1)  # set chip to disable (don't listen to input)
         self.reset()
-        self.set_contrast(0xba)
+        self.set_contrast(0xbf)
         self.clear()
+
+    def set_function(self):
+        value = 0x20 | self.power | self.addressing | self.instr
+        self.command([value])
+
+    def set_power(self, power, set=True):
+        """ Sets the power mode of the LCD controller """
+        assert power in [self.POWER_UP, self.POWER_DOWN], "Power must be POWER_UP or POWER_DOWN."
+        self.power = power
+        if set:
+            self.set_function()
+
+    def set_adressing(self, addr, set=True):
+        """ Sets the adressing mode """
+        assert addr in [self.ADDRESSING_HORIZ, self.ADDRESSING_VERT], "Addressing must be ADDRESSING_HORIZ or ADDRESSING_VERT."
+        self.addressing = addr
+        if set:
+            self.set_function()
+
+    def set_instr(self, instr, set=True):
+        """ Sets instruction set (basic/extended) """
+        assert instr in [self.INSTR_BASIC, self.INSTR_EXT], "Instr must be INSTR_BASIC or INSTR_EXT."
+        self.instr = instr
+        if set:
+            self.set_function()
+
+    def set_display(self, display_mode):
+        """ Sets display mode (blank, black, normal, inverse) """
+        assert display_mode in [self.DISPLAY_BLANK, self.DISPLAY_ALL, self.DISPLAY_NORMAL, self.DISPLAY_INVERSE], "Mode must be one of DISPLAY_BLANK, DISPLAY_ALL, DISPLAY_NORMAL or DISPLAY_INVERSE."
+        assert self.instr == self.INSTR_BASIC, "Please switch to basic instruction set first."
+        self.display_mode = display_mode
+        self.command([display_mode])
 
     def set_contrast(self, value):
         """ set LCD voltage, i.e. contrast """
@@ -116,6 +163,7 @@ class PCD8544:
         """ set cursor to bank y, column x """
         assert 0 <= x < self.width, "x must be between 0 and 83"
         assert 0 <= y < self.height // 8, "y must be between 0 and 5"
+        assert self.instr == self.INSTR_BASIC, "Please switch to basic instruction set first."
         self.command([x + 0x80, y + 0x40])
 
     def clear(self):
