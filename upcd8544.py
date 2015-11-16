@@ -74,6 +74,18 @@ class PCD8544:
     DISPLAY_ALL     = 0x09
     DISPLAY_NORMAL  = 0x0c
     DISPLAY_INVERSE = 0x0d
+    TEMP_COEFF_0 = 0x04
+    TEMP_COEFF_1 = 0x05
+    TEMP_COEFF_2 = 0x06
+    TEMP_COEFF_3 = 0x07
+    BIAS_1_4  = 0x17   # 1/4th
+    BIAS_1_5  = 0x16   # 1/5th
+    BIAS_1_6  = 0x15   # 1/6th
+    BIAS_1_7  = 0x14   # 1/7th
+    BIAS_1_8  = 0x13   # 1/8th
+    BIAS_1_9  = 0x12   # 1/9th
+    BIAS_1_10 = 0x11   # 1/10th
+    BIAS_1_11 = 0x10   # 1/11th
 
     def __init__(self, spi, rst, ce, dc, light, pwr=None):
         self.width  = 84
@@ -82,6 +94,12 @@ class PCD8544:
         self.addressing = self.ADDRESSING_HORIZ
         self.instr      = self.INSTR_BASIC
         self.display_mode = self.DISPLAY_NORMAL
+        self.temp_coeff = self.TEMP_COEFF_0
+        self.bias       = self.BIAS_1_11
+        self.voltage    = 3060
+
+        # storage for display contents (for pixel manipulation)
+        self.lcd = [[0x00 for j in range(self.width)] for i in range(self.height // 8)]
 
         # init the SPI bus and pins
         spi.init(spi.MASTER, baudrate=328125, bits=8, polarity=0, phase=1, firstbit=spi.MSB)
@@ -116,7 +134,8 @@ class PCD8544:
         self.set_contrast(0xbf)
         self.clear()
 
-    def set_function(self):
+    def _set_function(self):
+        """ Write current power/addressing/instructionset values to lcd. """
         value = 0x20 | self.power | self.addressing | self.instr
         self.command([value])
 
@@ -125,21 +144,21 @@ class PCD8544:
         assert power in [self.POWER_UP, self.POWER_DOWN], "Power must be POWER_UP or POWER_DOWN."
         self.power = power
         if set:
-            self.set_function()
+            self._set_function()
 
     def set_adressing(self, addr, set=True):
         """ Sets the adressing mode """
         assert addr in [self.ADDRESSING_HORIZ, self.ADDRESSING_VERT], "Addressing must be ADDRESSING_HORIZ or ADDRESSING_VERT."
         self.addressing = addr
         if set:
-            self.set_function()
+            self._set_function()
 
     def set_instr(self, instr, set=True):
         """ Sets instruction set (basic/extended) """
         assert instr in [self.INSTR_BASIC, self.INSTR_EXT], "Instr must be INSTR_BASIC or INSTR_EXT."
         self.instr = instr
         if set:
-            self.set_function()
+            self._set_function()
 
     def set_display(self, display_mode):
         """ Sets display mode (blank, black, normal, inverse) """
@@ -148,10 +167,34 @@ class PCD8544:
         self.display_mode = display_mode
         self.command([display_mode])
 
+    def set_temp_coeff(self, temp_coeff):
+        """ Sets temperature coefficient (0-3) """
+        assert 4 <= temp_coeff < 8, "Temperature coefficient must be one of TEMP_COEFF_0..TEMP_COEFF_3."
+        assert self.instr == self.INSTR_EXT, "Please switch to extended instruction set first."
+        self.temp_coeff = temp_coeff
+        self.command([temp_coeff])
+
+    def set_bias(self, bias):
+        """ Sets the LCD bias. """
+        assert 0x10 <= bias <= 0x17, "Bias must be one of BIAS_1_4..BIAS_1_11."
+        assert self.instr == self.INSTR_EXT, "Please switch to extended instruction set first."
+        self.bias = bias
+        self.command([bias])
+
+    def set_voltage(self, millivolts):
+        """ Sets the voltage of the LCD charge pump in millivolts. """
+        assert 3060 <= millivolts <= 10680, "Voltage must be between 3,000 and 10,680 mV."
+        assert self.instr == self.INSTR_EXT, "Please switch to extended instruction set first."
+        self.voltage = millivolts
+        basevoltage = millivolts - 3060
+        incrementor = basevoltage // 60
+        code = 0x80 & incrementor
+        self.command([code])
+
     def set_contrast(self, value):
         """ set LCD voltage, i.e. contrast """
         assert 0x80 <= value <= 0xff, "contrast value must be between 0x80 and 0xff"
-        self.command([0x21, 0x06, 0x14, value, 0x20, 0x0c])
+        self.command([0x21, self.TEMP_COEFF_2, self.BIAS_1_7, value, 0x20, self.DISPLAY_NORMAL])
         # 0x21 - enter extended instruction set (H=1)
         # 0x06 - set temperature coefficient 2
         # 0x14 - set BIAS system to n=3 (recomm. mux rate 1:40/1:34)
