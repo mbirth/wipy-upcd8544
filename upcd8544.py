@@ -90,10 +90,10 @@ class PCD8544:
     def __init__(self, spi, rst, ce, dc, light, pwr=None):
         self.width  = 84
         self.height = 48
-        self.power      = self.POWER_UP
+        self.power      = self.POWER_DOWN
         self.addressing = self.ADDRESSING_HORIZ
         self.instr      = self.INSTR_BASIC
-        self.display_mode = self.DISPLAY_NORMAL
+        self.display_mode = self.DISPLAY_BLANK
         self.temp_coeff = self.TEMP_COEFF_0
         self.bias       = self.BIAS_1_11
         self.voltage    = 3060
@@ -237,6 +237,14 @@ class PCD8544:
         self.rst.value(0)  # RST on
         self.sleep_us(100) # reset impulse has to be >100 ns and <100 ms
         self.rst.value(1)  # RST off
+        # Defaults after reset:
+        self.power      = self.POWER_DOWN
+        self.addressing = self.ADDRESSING_HORIZ
+        self.instr      = self.INSTR_BASIC
+        self.display_mode = self.DISPLAY_BLANK
+        self.temp_coeff = self.TEMP_COEFF_0
+        self.bias       = self.BIAS_1_11
+        self.voltage    = 3060
 
     def power_off(self):
         self.clear()
