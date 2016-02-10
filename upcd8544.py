@@ -98,9 +98,6 @@ class PCD8544:
         self.bias       = self.BIAS_1_11
         self.voltage    = 3060
 
-        # storage for display contents (for pixel manipulation)
-        self.lcd = [[0x00 for j in range(self.width)] for i in range(self.height // 8)]
-
         # init the SPI bus and pins
         spi.init(spi.MASTER, baudrate=328125, bits=8, polarity=0, phase=1, firstbit=spi.MSB)
         if "OUT_PP" in dir(rst):
@@ -183,7 +180,7 @@ class PCD8544:
 
     def set_voltage(self, millivolts):
         """ Sets the voltage of the LCD charge pump in millivolts. """
-        assert 3060 <= millivolts <= 10680, "Voltage must be between 3,000 and 10,680 mV."
+        assert 3060 <= millivolts <= 10680, "Voltage must be between 3,060 and 10,680 mV."
         assert self.instr == self.INSTR_EXT, "Please switch to extended instruction set first."
         self.voltage = millivolts
         basevoltage = millivolts - 3060
